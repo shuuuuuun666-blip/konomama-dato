@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<title>calc.js テスト</title>
+<style>
+  body { font-family: monospace; padding: 20px; white-space: pre-wrap; }
+  .ok { color: green; }
+  .fail { color: red; font-weight: bold; }
+</style>
+</head>
+<body>
+<div id="out">実行中...</div>
+<script type="module">
+import { compare, totalForYears, normalizeAmount, occurrencesPerYear } from "../js/calc.js";
+
+const out = document.getElementById("out");
+let lines = [];
+let passed = 0;
+let failed = 0;
+
+function assertEqual(actual, expected, label) {
+  const ok = actual === expected;
+  if (ok) passed++; else failed++;
+  lines.push(`${ok ? "OK  " : "FAIL"} ${label}  (actual=${actual}, expected=${expected})`);
+}
+
+function test(name, fn) {
+  lines.push(`--- ${name} ---`);
+  try { fn(); } catch (e) { failed++; lines.push("FAIL exception: " + e.message); }
+}
+
+test("spec example: 2h/day -> 1h/day for 3 years", () => {
+  const state = { unit: "hour", frequency: "day", amountA: 2, amountB: 1 };
+  const cmp = compare(state, 3);
+  assertEqual(cmp.a.total, 2190, "A total hours");
+  assertEqual(cmp.a.days, 91, "A days");
+  assertEqual(cmp.b.total, 1095, "B total hours");
+  assertEqual(cmp.b.days, 45, "B days");
+  assertEqual(cmp.diffTotal, 1095, "diff total hours");
+  assertEqual(cmp.diffDays, 45, "diff days");
+});
+
+test("normalizeAmount: min -> hour", () => {
+  const r = normalizeAmount(90, "min");
+  assertEqual(r.base, "hour", "base");
+  assertEqual(r.value, 1.5, "value");
+});
+
+test("occurrencesPerYear", () => {
+  assertEqual(occurrencesPerYear("day"), 365, "day");
+  assertEqual(occurrencesPerYear("month"), 12, "month");
+});
+
+test("money: 500yen/day x 3y", () => {
+  const r = totalForYears({ amount: 500, unit: "yen", frequency: "day" }, 3);
+  assertEqual(r.base, "yen", "base");
+  assertEqual(r.total, 547500, "total");
+  assertEqual(r.days, undefined, "no days for yen");
+});
+
+test("money: 3000yen/month x 1y", () => {
+  const r = totalForYears({ amount: 3000, unit: "yen", frequency: "month" }, 1);
+  assertEqual(r.total, 36000, "total");
+});
+
+test("build: 30min/day -> 60min/day x 3y", () => {
+  const state = { unit: "min", frequency: "day", amountA: 30, amountB: 60 };
+  const cmp = compare(state, 3);
+  assertEqual(cmp.a.total, 547.5, "A total");
+  assertEqual(cmp.a.days, 22, "A days");
+  assertEqual(cmp.b.total, 1095, "B total");
+  assertEqual(cmp.b.days, 45, "B days");
+  assertEqual(cmp.diffTotal, 547.5, "diff total");
+  assertEqual(cmp.diffDays, 22, "diff days");
+});
+
+test("edge: zero", () => {
+  const r = totalForYears({ amount: 0, unit: "hour", frequency: "day" }, 10);
+  assertEqual(r.total, 0, "total");
+  assertEqual(r.days, 0, "days");
+});
+
+test("edge: decimal", () => {
+  const r = totalForYears({ amount: 1.5, unit: "hour", frequency: "day" }, 1);
+  assertEqual(r.total, 547.5, "total");
+  assertEqual(r.days, 22, "days");
+});
+
+test("edge: large number", () => {
+  const r = totalForYears({ amount: 999999, unit: "yen", frequency: "month" }, 10);
+  assertEqual(r.total, 999999 * 12 * 10, "total");
+});
+
+test("edge: empty/NaN treated as 0", () => {
+  assertEqual(normalizeAmount("", "hour").value, 0, "empty string");
+  assertEqual(normalizeAmount(undefined, "yen").value, 0, "undefined");
+  assertEqual(normalizeAmount(NaN, "min").value, 0, "NaN");
+});
+
+test("count unit x 10 years", () => {
+  const r = totalForYears({ amount: 2, unit: "count", frequency: "day" }, 10);
+  assertEqual(r.base, "count", "base");
+  assertEqual(r.total, 2 * 365 * 10, "total");
+});
+
+lines.push("");
+lines.push(`RESULT: ${passed} passed, ${failed} failed`);
+out.innerHTML = lines
+  .map((l) => (l.startsWith("FAIL") ? `<span class="fail">${l}</span>` : `<span class="ok">${l}</span>`))
+  .join("\n");
+window.__testResult = { passed, failed };
+console.log("TEST_DONE", passed, failed);
+</script>
+</body>
+</html>
