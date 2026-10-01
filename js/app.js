@@ -327,12 +327,13 @@ function renderTimeline() {
     if (i < items.length) {
       items[i].classList.add("show");
       i++;
-      timer = setTimeout(reveal, 420);
+      timer = setTimeout(reveal, 180);
     } else {
-      timer = setTimeout(() => goto("resultA"), 500);
+      timer = setTimeout(() => goto("resultA"), 300);
     }
   };
-  let timer = setTimeout(reveal, 200);
+  // 演出全体でおよそ1秒前後になるよう調整(待たせすぎない)
+  let timer = setTimeout(reveal, 100);
 
   bind("#skip-btn", "click", () => {
     clearTimeout(timer);
@@ -345,19 +346,19 @@ function renderResultA() {
   appEl.innerHTML = `
     ${topBar({ step: 3 })}
     <main class="screen screen--result">
-      <p class="sub">${describeAmount(state.amountA, state.unit, state.frequency)}${habitLabel()}を続けると</p>
       ${yearChips(state.years)}
-      <p class="context">${state.years}年間の${habitLabel()}</p>
-      <div class="big-number">${formatNumber(r.total)}<span class="unit">${UNIT_LABEL[state.unit] === "円" ? "" : ""}${
+      <h2 class="result-headline">${state.years}年間、このままだと。</h2>
+      <p class="sub">${describeAmount(state.amountA, state.unit, state.frequency)}${habitLabel()}を続けた場合</p>
+      <div class="big-number">${formatNumber(r.total)}<span class="unit">${
     r.base === "yen" ? "円" : r.base === "hour" ? "時間" : "回"
   }</span></div>
       ${
         r.base === "hour"
           ? `<div class="big-number big-number--sub">約${formatNumber(r.days)}<span class="unit">日</span></div>
-             <p class="note">${state.years}年間のうち、約${formatNumber(r.days)}日分をこの習慣に使う計算です。</p>`
+             <p class="note">${state.years}年間のうち、約${formatNumber(r.days)}日分を${habitLabel()}に使う計算です。</p>`
           : `<p class="note">このペースを${state.years}年間続けた場合の合計です。</p>`
       }
-      <button class="cta" id="go-compare">次へ</button>
+      <button class="cta" id="go-compare">もし、今日から変えたら？</button>
     </main>
   `;
 
@@ -379,15 +380,26 @@ function suggestB() {
   return half;
 }
 
+function questionPhrase() {
+  const habit = habitLabel();
+  const increase = meta().direction === "increase";
+  if (state.unit === "min" || state.unit === "hour") {
+    return `${habit}の時間を${increase ? "増やしたら" : "減らしたら"}？`;
+  }
+  if (state.unit === "yen") {
+    return increase ? `${habit}にまわすお金を増やしたら？` : `${habit}で使うお金を減らしたら？`;
+  }
+  return `${habit}の回数を${increase ? "増やしたら" : "減らしたら"}？`;
+}
+
 function renderCompareInput() {
   if (state.amountB === null || state.amountB === undefined) state.amountB = suggestB();
-  const verb = meta().direction === "increase" ? "ふやしたら" : "へらしたら";
   const step = STEP_DEFAULT[state.unit] || 1;
 
   appEl.innerHTML = `
     ${topBar({ step: 4 })}
     <main class="screen screen--input4">
-      <p class="question">もし今日から、<br />${habitLabel()}を${verb}？</p>
+      <p class="question">もし今日から、<br />${questionPhrase()}</p>
 
       <div class="stepper">
         <button class="stepper-btn" id="dec">−</button>

@@ -278,6 +278,11 @@ input {
   color: var(--text-sub);
   margin: 20px 0 4px;
 }
+.result-headline {
+  font-size: clamp(20px, 6vw, 26px);
+  font-weight: 800;
+  margin: 18px 0 4px;
+}
 .big-number {
   font-size: clamp(40px, 14vw, 64px);
   font-weight: 800;
