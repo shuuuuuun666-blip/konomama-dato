@@ -131,7 +131,7 @@ function shareUrl() {
 
 function buildShareText(cmp) {
   const habit = habitLabel();
-  const changeVerb = meta().direction === "increase" ? "ふやす" : "へらす";
+  const changeVerb = meta().direction === "increase" ? "増やす" : "減らす";
   const line1 =
     meta().direction === "increase"
       ? `${describeAmount(state.amountA, state.unit, state.frequency)}${habit}を、${describeAmount(
@@ -487,16 +487,39 @@ function renderCompareResult() {
   bind("#go-final", "click", () => goto("final"));
 }
 
+// カテゴリごとに自然な日本語になるよう文章テンプレートを分ける。
+// (時間:スマホ等「モノ」が主語になりがちなので「の時間を」、
+//  積み上げ:勉強等「行為」が主語になりがちなので「時間を」)
+function finalChangePhrase() {
+  const habit = habitLabel();
+  const delta = Math.abs(Number(state.amountA) - Number(state.amountB));
+  const freqPhrase = state.frequency === "month" ? "毎月" : "1日";
+  const amount = `${formatNumber(delta)}${UNIT_LABEL[state.unit]}`;
+
+  if (state.category === "time") {
+    return `${habit}の時間を${freqPhrase}${amount}減らす`;
+  }
+  if (state.category === "money") {
+    return `${habit}代を${freqPhrase}${amount}減らす`;
+  }
+  // 積み上げ
+  if (state.unit === "min" || state.unit === "hour") {
+    return `${habit}時間を${freqPhrase}${amount}増やす`;
+  }
+  if (state.unit === "yen") {
+    return `${habit}にまわすお金を${freqPhrase}${amount}増やす`;
+  }
+  return `${habit}の回数を${freqPhrase}${amount}増やす`;
+}
+
 function renderFinal() {
   const cmp = compare(state, state.years);
-  const verb = meta().direction === "increase" ? "ふやす" : "へらす";
-  const delta = Math.abs(Number(state.amountA) - Number(state.amountB));
 
   appEl.innerHTML = `
     ${topBar({ step: 5 })}
     <main class="screen screen--final">
       <h2 class="final-title">今日が分岐点になりました。</h2>
-      <p class="sub">今日から<br />「${habitLabel()}を${formatNumber(delta)}${UNIT_LABEL[state.unit]}${verb}」</p>
+      <p class="sub">今日から<br />「${finalChangePhrase()}」</p>
 
       <p class="context">${state.years}年後の${diffLabel(meta().direction)}${resourceNoun(cmp.base)}</p>
       <div class="big-number big-number--accent">
