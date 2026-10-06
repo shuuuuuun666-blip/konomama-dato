@@ -135,6 +135,20 @@ input {
   margin: 0 0 18px;
 }
 
+.intro-line {
+  font-size: 13px;
+  color: var(--text-sub);
+  margin: 0 0 14px;
+}
+
+.input-question {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 4px 0 10px;
+  line-height: 1.5;
+}
+
 .field {
   display: flex;
   flex-direction: column;

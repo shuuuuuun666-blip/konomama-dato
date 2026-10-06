@@ -17,21 +17,18 @@ const CATEGORY_META = {
     direction: "reduce",
     units: ["min", "hour"],
     placeholder: "スマホ",
-    exampleLine: "例：毎日2時間スマホを見ている",
   },
   money: {
     label: "お金",
     direction: "reduce",
     units: ["yen"],
     placeholder: "コンビニ",
-    exampleLine: "例：毎日500円コンビニで使う",
   },
   build: {
     label: "積み上げ",
     direction: "increase",
     units: ["min", "hour", "count", "yen"],
     placeholder: "勉強",
-    exampleLine: "例：毎日30分勉強する",
   },
 };
 
@@ -64,6 +61,27 @@ function meta() {
 
 function habitLabel() {
   return (state.label || "").trim() || meta().placeholder;
+}
+
+function freqWord() {
+  return state.frequency === "month" ? "毎月" : "1日";
+}
+
+// カテゴリ・単位ごとに「何を入力すればいいか」が一読で分かる質問文を作る。
+function inputQuestion() {
+  const habit = habitLabel();
+  const freq = freqWord();
+  if (state.category === "money") {
+    return `${habit}に${freq}いくら使っていますか？`;
+  }
+  if (state.category === "time") {
+    return state.unit === "min" ? `${habit}を${freq}何分使っていますか？` : `${habit}を${freq}何時間使っていますか？`;
+  }
+  // 積み上げ
+  if (state.unit === "min") return `${habit}を${freq}何分していますか？`;
+  if (state.unit === "hour") return `${habit}を${freq}何時間していますか？`;
+  if (state.unit === "count") return `${habit}を${freq}何回していますか？`;
+  return `${habit}を${freq}いくらしていますか？`;
 }
 
 function goto(screen) {
@@ -219,7 +237,7 @@ function renderHome() {
     ${topBar({ back: false, step: 1 })}
     <main class="screen screen--home">
       <h1 class="brand">このままだと。</h1>
-      <p class="lead">今日と同じ生活を続けた、<br />3年後の自分を見てみる。</p>
+      <p class="lead">今の習慣を続けた未来を、数字で見る。</p>
 
       <div class="category-tabs" role="group" aria-label="カテゴリを選ぶ">
         ${Object.entries(CATEGORY_META)
@@ -232,12 +250,26 @@ function renderHome() {
           .join("")}
       </div>
 
-      <p class="hint">${m.exampleLine}</p>
+      <p class="intro-line">まず、今の習慣を教えてください。</p>
 
       <label class="field">
-        <span class="field-label">何の習慣？（省略可）</span>
+        <span class="field-label">習慣の名前（省略可）</span>
         <input type="text" id="input-label" placeholder="${m.placeholder}" maxlength="20" value="${state.label}" />
       </label>
+
+      <div class="field">
+        <span class="field-label">頻度</span>
+        <div class="segmented">
+          ${["day", "month"]
+            .map(
+              (f) =>
+                `<button class="seg ${f === state.frequency ? "seg--active" : ""}" data-action="set-frequency" data-freq="${f}">${FREQ_LABEL[f]}</button>`
+            )
+            .join("")}
+        </div>
+      </div>
+
+      <p class="input-question" id="input-question">${inputQuestion()}</p>
 
       <div class="field-row">
         <label class="field field--amount">
@@ -259,18 +291,6 @@ function renderHome() {
         }
       </div>
 
-      <div class="field">
-        <span class="field-label">頻度</span>
-        <div class="segmented">
-          ${["day", "month"]
-            .map(
-              (f) =>
-                `<button class="seg ${f === state.frequency ? "seg--active" : ""}" data-action="set-frequency" data-freq="${f}">${FREQ_LABEL[f]}</button>`
-            )
-            .join("")}
-        </div>
-      </div>
-
       <button class="cta" id="go-timeline">3年後へ進む</button>
     </main>
   `;
@@ -288,7 +308,11 @@ function renderHome() {
     state.frequency = e.currentTarget.dataset.freq;
     render();
   });
-  bind("#input-label", "input", (e) => (state.label = e.target.value));
+  bind("#input-label", "input", (e) => {
+    state.label = e.target.value;
+    const q = document.getElementById("input-question");
+    if (q) q.textContent = inputQuestion();
+  });
   bind("#input-amount", "input", (e) => (state.amountA = e.target.value));
   bind("#go-timeline", "click", () => {
     const amt = Number(state.amountA);
@@ -341,6 +365,16 @@ function renderTimeline() {
   });
 }
 
+function resultNote(r) {
+  if (r.base !== "hour") {
+    return `このペースを${state.years}年間続けた場合の合計です。`;
+  }
+  if (state.category === "time") {
+    return `${habitLabel()}を見て過ごすことになります。`;
+  }
+  return `${state.years}年間のうち、約${formatNumber(r.days)}日分を${habitLabel()}に使う計算です。`;
+}
+
 function renderResultA() {
   const r = totalForYears({ amount: state.amountA, unit: state.unit, frequency: state.frequency }, state.years);
   appEl.innerHTML = `
@@ -352,12 +386,8 @@ function renderResultA() {
       <div class="big-number">${formatNumber(r.total)}<span class="unit">${
     r.base === "yen" ? "円" : r.base === "hour" ? "時間" : "回"
   }</span></div>
-      ${
-        r.base === "hour"
-          ? `<div class="big-number big-number--sub">約${formatNumber(r.days)}<span class="unit">日</span></div>
-             <p class="note">${state.years}年間のうち、約${formatNumber(r.days)}日分を${habitLabel()}に使う計算です。</p>`
-          : `<p class="note">このペースを${state.years}年間続けた場合の合計です。</p>`
-      }
+      ${r.base === "hour" ? `<div class="big-number big-number--sub">約${formatNumber(r.days)}<span class="unit">日</span></div>` : ""}
+      <p class="note">${resultNote(r)}</p>
       <button class="cta" id="go-compare">もし、今日から変えたら？</button>
     </main>
   `;
@@ -528,9 +558,9 @@ function renderFinal() {
       ${cmp.base === "hour" ? `<div class="big-number big-number--sub">約${formatNumber(cmp.diffDays)}<span class="unit">日</span></div>` : ""}
 
       <div class="final-actions">
-        <button class="cta cta--ghost" id="future-btn">あの日から。を始める</button>
         <button class="cta" id="share-btn">結果をシェア</button>
-        <button class="link-btn" id="restart-btn">別の習慣で試す</button>
+        <button class="cta cta--ghost" id="restart-btn">別の習慣も見てみる</button>
+        <button class="link-btn" id="future-btn">あの日から。を始める</button>
       </div>
     </main>
   `;
