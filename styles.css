@@ -322,6 +322,14 @@ input {
   margin: 12px 0 0;
 }
 
+.impact-line {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.6;
+  margin: 18px 0 0;
+}
+
 .year-chips {
   display: flex;
   gap: 8px;

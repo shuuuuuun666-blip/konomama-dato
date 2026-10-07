@@ -365,12 +365,40 @@ function renderTimeline() {
   });
 }
 
+// 大きい数字を「24時間ずっと使い続けたら」という身近な尺度に変換する。
+// days は totalForYears() が算出した「24時間換算の日数」をそのまま使うため、
+// 数学的な意味は変えず、表現だけを日/月/年の自然な単位に丸める。
+function timeConversionLine(days, habit) {
+  if (days < 1) return null;
+  if (days < 30) {
+    return `丸${formatNumber(days)}日間、24時間ずっと${habit}を使い続けるのと同じ時間です。`;
+  }
+  const months = Math.round(days / 30);
+  if (months < 24) {
+    return `丸${formatNumber(months)}か月間、24時間ずっと${habit}を使い続けるのと同じ時間です。`;
+  }
+  const yearsEq = Math.max(1, Math.round(months / 12));
+  return `約${formatNumber(yearsEq)}年間、24時間ずっと${habit}を使い続けるのと同じ時間です。`;
+}
+
 function resultNote(r) {
+  if (r.base === "yen") {
+    const monthlyAvg = r.total / (state.years * 12);
+    const yearlyAvg = r.total / state.years;
+    return `毎月平均${formatYen(monthlyAvg)}、年間平均${formatYen(yearlyAvg)}を使い続けている計算です。`;
+  }
   if (r.base !== "hour") {
     return `このペースを${state.years}年間続けた場合の合計です。`;
   }
   if (state.category === "time") {
-    return `${habitLabel()}を見て過ごすことになります。`;
+    return timeConversionLine(r.days, habitLabel()) || `${habitLabel()}を見て過ごすことになります。`;
+  }
+  // 積み上げ(時間系)：1年あたりに増える量も添える
+  const annualDays = Math.floor(r.total / state.years / 24);
+  if (annualDays >= 1) {
+    return `1年間では約${formatNumber(annualDays)}日分、${state.years}年間では約${formatNumber(
+      r.days
+    )}日分増える計算です。`;
   }
   return `${state.years}年間のうち、約${formatNumber(r.days)}日分を${habitLabel()}に使う計算です。`;
 }
@@ -388,6 +416,7 @@ function renderResultA() {
   }</span></div>
       ${r.base === "hour" ? `<div class="big-number big-number--sub">約${formatNumber(r.days)}<span class="unit">日</span></div>` : ""}
       <p class="note">${resultNote(r)}</p>
+      <p class="impact-line">何もしなければ、この数字はそのまま積み上がります。</p>
       <button class="cta" id="go-compare">もし、今日から変えたら？</button>
     </main>
   `;
@@ -464,11 +493,34 @@ function renderCompareInput() {
   });
 }
 
+function worldBTitle() {
+  const delta = Math.abs(Number(state.amountA) - Number(state.amountB));
+  const verb = meta().direction === "increase" ? "増やす" : "減らす";
+  return `今日から${formatNumber(delta)}${UNIT_LABEL[state.unit]}${verb}`;
+}
+
+// A/Bの差を「日常語」の1文にする。日数換算できる場合はそれを主役にする。
+function compareMessage(cmp) {
+  const freq = freqWord();
+  const delta = Math.abs(Number(state.amountA) - Number(state.amountB));
+  const verb = meta().direction === "increase" ? "増やす" : "減らす";
+  const resultVerb = meta().direction === "increase" ? "増えます" : "戻ります";
+  const deltaText = `${freq}${formatNumber(delta)}${UNIT_LABEL[state.unit]}${verb}`;
+
+  if (cmp.base === "hour") {
+    return `${deltaText}だけで、${state.years}年間では約${formatNumber(cmp.diffDays)}日分の時間が${resultVerb}。`;
+  }
+  if (cmp.base === "yen") {
+    const monthlyDiffAvg = cmp.diffTotal / (state.years * 12);
+    return `${deltaText}だけで、${state.years}年間で約${formatYen(cmp.diffTotal)}（毎月平均${formatYen(
+      monthlyDiffAvg
+    )}）${resultVerb}。`;
+  }
+  return `${deltaText}だけで、${state.years}年間で約${formatNumber(cmp.diffTotal)}${resourceNoun(cmp.base)}${resultVerb}。`;
+}
+
 function renderCompareResult() {
   const cmp = compare(state, state.years);
-  const delta = Math.abs(Number(state.amountA) - Number(state.amountB));
-  const dLabel = diffLabel(meta().direction);
-  const noun = resourceNoun(cmp.base);
 
   appEl.innerHTML = `
     ${topBar({ step: 4 })}
@@ -477,26 +529,26 @@ function renderCompareResult() {
 
       <div class="worlds">
         <div class="world-card">
-          <p class="world-title">世界線A（今のまま）</p>
+          <p class="world-title">このまま</p>
           <p class="world-amount">${describeAmount(state.amountA, state.unit, state.frequency)}</p>
           <p class="world-total">${totalLine(cmp.base, cmp.a.total, cmp.a.days)}</p>
         </div>
         <div class="world-card world-card--b">
-          <p class="world-title">世界線B（変えたら）</p>
+          <p class="world-title">${worldBTitle()}</p>
           <p class="world-amount">${describeAmount(state.amountB, state.unit, state.frequency)}</p>
           <p class="world-total">${totalLine(cmp.base, cmp.b.total, cmp.b.days)}</p>
         </div>
       </div>
 
-      <p class="context">${dLabel}${noun}</p>
+      <p class="context">その差</p>
       <div class="big-number big-number--accent">
-        ${cmp.base === "hour" ? formatNumber(cmp.diffTotal) : formatNumber(cmp.diffTotal)}<span class="unit">${
+        ${formatNumber(cmp.diffTotal)}<span class="unit">${
     cmp.base === "yen" ? "円" : cmp.base === "hour" ? "時間" : "回"
   }</span>
       </div>
       ${cmp.base === "hour" ? `<div class="big-number big-number--sub">約${formatNumber(cmp.diffDays)}<span class="unit">日</span></div>` : ""}
 
-      <p class="message">${state.years}年後の差は、今日の${formatNumber(delta)}${UNIT_LABEL[state.unit]}から。</p>
+      <p class="message">${compareMessage(cmp)}</p>
 
       <div class="btn-row">
         <button class="link-btn" id="retry-b">別の数字で試す</button>
